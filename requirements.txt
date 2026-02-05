@@ -1,0 +1,14 @@
+requests
+torch
+torchvision
+torchaudio
+fastapi
+uvicorn
+scikit-learn
+pandas
+numpy
+sqlalchemy
+psycopg2-binary
+python-dotenv
+pydantic
+requests
