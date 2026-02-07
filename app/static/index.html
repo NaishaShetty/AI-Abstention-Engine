@@ -4,27 +4,148 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Abstention Engine Dashboard</title>
+    <title>Aegis | AI Abstention Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f9fafb;
+        :root {
+            --primary: #10b981;
+            --accent: #6366f1;
+            --bg: #030712;
+            --card: rgba(17, 24, 39, 0.7);
+            --border: rgba(255, 255, 255, 0.08);
         }
 
-        .glass {
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(8px);
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: #f3f4f6;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        .mesh-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background:
+                radial-gradient(circle at 0% 0%, rgba(16, 185, 129, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 100% 100%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 1) 0%, var(--bg) 100%);
+        }
+
+        .glass-panel {
+            background: var(--card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-panel:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 10px var(--primary);
+            transition: transform 0.2s;
+        }
+
+        input[type="range"]:hover::-webkit-slider-thumb {
+            transform: scale(1.2);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), #059669);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .glow-text {
+            text-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        @keyframes pulse-soft {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.6;
+            }
+        }
+
+        .animate-pulse-soft {
+            animation: pulse-soft 2s infinite ease-in-out;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
         }
     </style>
 </head>
 
-<body class="text-gray-900">
+<body>
+    <div class="mesh-bg"></div>
     <div id="root"></div>
 
     <script type="text/babel">
@@ -48,16 +169,15 @@
             useEffect(() => {
                 if (health && health.risk !== undefined) {
                     setHistory(prev => {
-                        // Use milliseconds to ensure uniqueness on high-speed clicks
-                        const time = new Date().toLocaleTimeString() + "." + new Date().getMilliseconds();
-
-                        const newHistory = [...prev, {
+                        const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+                        const newElement = {
                             time,
                             risk: health.risk,
                             abstain: health.abstain_rate_50,
                             review: health.review_rate_50
-                        }];
-                        return newHistory.slice(-40);
+                        };
+                        const newHistory = [...prev, newElement];
+                        return newHistory.slice(-25);
                     });
                 }
             }, [health]);
@@ -68,37 +188,33 @@
                         chartInstance.current.destroy();
                     }
                     const ctx = chartRef.current.getContext('2d');
+                    Chart.defaults.color = 'rgba(255, 255, 255, 0.5)';
+                    Chart.defaults.font.family = 'Outfit';
+
                     chartInstance.current = new Chart(ctx, {
                         type: 'line',
                         data: {
                             labels: history.map(h => h.time),
                             datasets: [
                                 {
-                                    label: 'System Risk',
+                                    label: 'Risk Vector',
                                     data: history.map(h => h.risk),
-                                    borderColor: '#ef4444',
-                                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                    borderWidth: 3,
+                                    borderColor: '#10b981',
+                                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                    borderWidth: 2,
                                     fill: true,
                                     tension: 0.4,
-                                    yAxisID: 'yRisk'
+                                    yAxisID: 'y'
                                 },
                                 {
-                                    label: 'Abstain Rate (%)',
-                                    data: history.map(h => h.abstain * 100),
-                                    borderColor: '#0d9488',
+                                    label: 'Policy Rates',
+                                    data: history.map(h => (h.abstain + h.review) * 5), // Scaled for visibility
+                                    borderColor: '#6366f1',
                                     borderDash: [5, 5],
+                                    borderWidth: 1,
                                     fill: false,
                                     tension: 0.1,
-                                    yAxisID: 'yRate'
-                                },
-                                {
-                                    label: 'Review Rate (%)',
-                                    data: history.map(h => h.review * 100),
-                                    borderColor: '#f59e0b',
-                                    fill: false,
-                                    tension: 0.1,
-                                    yAxisID: 'yRate'
+                                    yAxisID: 'y'
                                 }
                             ]
                         },
@@ -106,32 +222,17 @@
                             responsive: true,
                             maintainAspectRatio: false,
                             plugins: {
-                                legend: {
-                                    display: true,
-                                    position: 'top',
-                                    labels: { usePointStyle: true, boxWidth: 6, font: { size: 10 } }
-                                }
+                                legend: { display: false }
                             },
                             scales: {
-                                yRisk: {
-                                    type: 'linear',
-                                    display: true,
-                                    position: 'left',
+                                y: {
                                     beginAtZero: true,
-                                    max: 5,
-                                    title: { display: true, text: 'Risk Score', font: { weight: 'bold' } },
-                                    grid: { color: '#f3f4f6' }
+                                    max: 10,
+                                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
                                 },
-                                yRate: {
-                                    type: 'linear',
-                                    display: true,
-                                    position: 'right',
-                                    beginAtZero: true,
-                                    max: 100,
-                                    title: { display: true, text: 'Rates (%)' },
-                                    grid: { drawOnChartArea: false }
-                                },
-                                x: { grid: { display: false }, ticks: { maxRotation: 45, minRotation: 45, font: { size: 9 } } }
+                                x: {
+                                    grid: { display: false }
+                                }
                             }
                         }
                     });
@@ -162,10 +263,9 @@
                     });
                     const data = await res.json();
                     setResult(data);
-                    // Crucial: await health update
                     await fetchHealth();
                 } catch (err) {
-                    alert("Prediction failed. Make sure the server is running.");
+                    alert("System Offline");
                 } finally {
                     setLoading(false);
                 }
@@ -183,197 +283,195 @@
                 setFeatures(newFeatures);
             };
 
-            const getDecisionColor = (decision) => {
-                switch (decision) {
-                    case 'PROCEED': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-                    case 'REVIEW': return 'bg-amber-100 text-amber-700 border-amber-200';
-                    case 'ABSTAIN': return 'bg-rose-100 text-rose-700 border-rose-200';
-                    default: return 'bg-gray-100 text-gray-700 border-gray-200';
-                }
-            };
-
             const getRiskColor = (state) => {
                 switch (state) {
-                    case 'low': return 'text-emerald-600';
-                    case 'elevated': return 'text-amber-600';
-                    case 'critical': return 'text-rose-600';
-                    default: return 'text-gray-600';
+                    case 'low': return 'text-emerald-400';
+                    case 'elevated': return 'text-amber-400';
+                    case 'critical': return 'text-rose-400';
+                    default: return 'text-white';
                 }
             };
 
             return (
-                <div class="min-h-screen p-6 md:p-10">
-                    <header class="mb-10 flex justify-between items-center">
+                <div class="max-w-[1400px] mx-auto px-6 py-8 md:py-12">
+                    {/* Header */}
+                    <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
                         <div>
-                            <h1 class="text-3xl font-bold tracking-tight text-gray-900">AI Abstention Engine</h1>
-                            <p class="text-gray-500 mt-1">Real-time adaptive AI safety monitoring</p>
-                        </div>
-                        <div class="flex gap-4">
-                            {health && (
-                                <div class="glass px-4 py-2 rounded-xl border border-white flex items-center gap-3 shadow-sm">
-                                    <span class="relative flex h-3 w-3">
-                                        <span class={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${health.risk_state === 'low' ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
-                                        <span class={`relative inline-flex rounded-full h-3 w-3 ${health.risk_state === 'low' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                                    </span>
-                                    <span class="text-sm font-medium uppercase tracking-wider text-gray-600">{health.status === 'healthy' ? 'Live' : 'Starting'}</span>
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.040L3 4.53V9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622V4.53l-.382-.016z"></path></svg>
                                 </div>
-                            )}
+                                <h1 class="text-4xl font-extrabold tracking-tight text-white uppercase italic">Aegis</h1>
+                            </div>
+                            <p class="text-gray-400 font-medium ml-1">Adaptive AI Abstention Control Protocol</p>
+                        </div>
+
+                        <div class="glass-panel px-6 py-3 flex items-center gap-6 border-emerald-500/20">
+                            <div class="flex items-center">
+                                <span class={`status-dot ${health?.status === 'healthy' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+                                <span class="text-sm font-bold uppercase tracking-widest opacity-80">{health?.status || 'INIT'}</span>
+                            </div>
+                            <div class="h-4 w-[1px] bg-white/10"></div>
+                            <div class="text-xs mono opacity-50">NODE_01_PROD</div>
                         </div>
                     </header>
 
-                    <main class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                        {/* Left Panel: Inputs */}
-                        <div class="lg:col-span-4 space-y-6">
-                            <section class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-                                <h2 class="text-lg font-semibold mb-6 flex items-center gap-2">
-                                    <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
-                                    Input Parameters
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        {/* Control Column */}
+                        <div class="lg:col-span-4 space-y-8">
+                            <section class="glass-panel p-8">
+                                <h2 class="text-lg font-bold mb-8 flex items-center gap-3 uppercase tracking-wider text-emerald-400">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                                    Input Vectors
                                 </h2>
-                                <div class="space-y-5">
+                                <div class="space-y-6">
                                     {features.map((f, i) => (
-                                        <div key={i}>
-                                            <div class="flex justify-between text-xs font-medium text-gray-500 mb-2 uppercase tracking-tight">
-                                                <span>Feature {i + 1}</span>
-                                                <span>{f.toFixed(2)}</span>
+                                        <div key={i} class="group">
+                                            <div class="flex justify-between text-[11px] font-bold text-gray-400 mb-3 uppercase tracking-widest group-hover:text-emerald-400 transition-colors">
+                                                <span>Param {i + 1}</span>
+                                                <span class="mono">{f.toFixed(3)}</span>
                                             </div>
                                             <input
-                                                type="range" min="0" max="1" step="0.01"
+                                                type="range" min="0" max="1" step="0.001"
                                                 value={f}
                                                 onChange={(e) => handleFeatureChange(i, e.target.value)}
-                                                class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-teal-600"
+                                                class="w-full"
                                             />
                                         </div>
                                     ))}
                                 </div>
-                                <div class="flex gap-3 mt-8">
+                                <div class="flex flex-col gap-4 mt-10">
                                     <button
                                         onClick={() => runPrediction()}
                                         disabled={loading}
-                                        class={`flex-1 py-4 rounded-2xl font-bold text-white transition-all shadow-lg active:scale-95 ${loading ? 'bg-gray-400' : 'bg-teal-600 hover:bg-teal-700 shadow-teal-200'}`}
+                                        class={`btn-primary w-full py-4 rounded-xl font-bold text-sm uppercase tracking-widest text-white active:scale-95 ${loading ? 'opacity-50 grayscale' : ''}`}
                                     >
-                                        {loading ? '...' : 'Run Prediction'}
+                                        {loading ? 'Processing...' : 'Execute Inference'}
                                     </button>
                                     <button
                                         onClick={triggerManualFailure}
-                                        disabled={loading}
-                                        title="Send vectors that likely trigger failure"
-                                        class={`px-6 py-4 rounded-2xl font-bold bg-rose-50 text-rose-600 border border-rose-100 transition-all hover:bg-rose-100 active:scale-95 ${loading ? 'opacity-50' : ''}`}
+                                        class="w-full py-4 rounded-xl font-bold text-[10px] uppercase tracking-widest text-rose-400 border border-rose-400/20 hover:bg-rose-400/10 transition-all active:scale-95"
                                     >
-                                        Inject Failure
+                                        Inject failure signal
                                     </button>
                                 </div>
-                                <p class="text-[10px] text-gray-400 mt-4 text-center leading-relaxed">
-                                    Tip: Low confidence (&lt;45%) triggers failure. <br />
-                                    Click <b>Inject Failure</b> to force a risk spike.
-                                </p>
                             </section>
 
-                            <section class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-                                <h2 class="text-lg font-semibold mb-6 flex items-center gap-2">
-                                    <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                                    System Metrics
+                            <section class="glass-panel p-8">
+                                <h2 class="text-lg font-bold mb-8 flex items-center gap-3 uppercase tracking-wider text-indigo-400">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                                    System Telemetry
                                 </h2>
                                 {health ? (
                                     <div class="grid grid-cols-2 gap-4">
-                                        <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Risk Score</div>
-                                            <div class={`text-2xl font-bold ${getRiskColor(health.risk_state)}`}>{health.risk.toFixed(2)}</div>
+                                        <div class="p-6 bg-white/5 rounded-2xl border border-white/5">
+                                            <div class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-2">Risk Index</div>
+                                            <div class={`text-3xl font-black italic mono ${getRiskColor(health.risk_state)}`}>{health.risk.toFixed(2)}</div>
                                         </div>
-                                        <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">State</div>
-                                            <div class={`text-sm font-bold uppercase tracking-wide mt-1 ${getRiskColor(health.risk_state)}`}>{health.risk_state}</div>
+                                        <div class="p-6 bg-white/5 rounded-2xl border border-white/5">
+                                            <div class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-2">Policy Modality</div>
+                                            <div class={`text-xs font-bold uppercase tracking-wider mt-2 ${getRiskColor(health.risk_state)}`}>{health.risk_state}</div>
                                         </div>
-                                        <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Abstain (50)</div>
-                                            <div class="text-2xl font-bold text-gray-700">{(health.abstain_rate_50 * 100).toFixed(0)}%</div>
+                                        <div class="p-4 bg-white/5 rounded-2xl border border-white/5">
+                                            <div class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1">Abstain %</div>
+                                            <div class="text-xl font-bold mono text-white/80">{(health.abstain_rate_50 * 100).toFixed(1)}%</div>
                                         </div>
-                                        <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Review (50)</div>
-                                            <div class="text-2xl font-bold text-gray-700">{(health.review_rate_50 * 100).toFixed(0)}%</div>
+                                        <div class="p-4 bg-white/5 rounded-2xl border border-white/5">
+                                            <div class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1">Review %</div>
+                                            <div class="text-xl font-bold mono text-white/80">{(health.review_rate_50 * 100).toFixed(1)}%</div>
                                         </div>
                                     </div>
                                 ) : (
-                                    <div class="animate-pulse flex space-x-4">
-                                        <div class="flex-1 space-y-4 py-1">
-                                            <div class="h-4 bg-gray-200 rounded w-3/4"></div>
-                                            <div class="space-y-2">
-                                                <div class="h-4 bg-gray-200 rounded"></div>
-                                                <div class="h-4 bg-gray-200 rounded w-5/6"></div>
-                                            </div>
-                                        </div>
+                                    <div class="animate-pulse space-y-4">
+                                        <div class="h-16 bg-white/5 rounded-2xl"></div>
+                                        <div class="h-16 bg-white/5 rounded-2xl"></div>
                                     </div>
                                 )}
                             </section>
                         </div>
 
-                        {/* Main Panel: Results & Visualization */}
+                        {/* Display Column */}
                         <div class="lg:col-span-8 space-y-8">
-                            {/* Prediction Result */}
-                            <section class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 min-h-[300px] flex flex-col justify-center transition-all">
+                            <section class="glass-panel p-10 min-h-[360px] flex flex-col justify-center relative overflow-hidden">
                                 {!result ? (
-                                    <div class="text-center py-10 opacity-40">
-                                        <div class="mb-4 flex justify-center">
-                                            <svg class="w-16 h-16 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                                    <div class="text-center py-10 opacity-20">
+                                        <div class="mb-6 flex justify-center">
+                                            <svg class="w-20 h-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A10.003 10.003 0 0012 3c1.268 0 2.39.675 3 1.71m3.892 8.76l.066.017c.595.145 1.147.223 1.64.223h0c1.1 0 2-.9 2-2V8a2 2 0 00-2-2h-3.32m-1.79 0A2 2 0 0014 4h-4a2 2 0 00-2 2h0m3 4h0a2 2 0 002 2h0a2 2 0 002-2H9z"></path></svg>
                                         </div>
-                                        <p class="text-lg">Waiting for inference call...</p>
+                                        <p class="text-sm uppercase tracking-[0.2em] font-medium">System Idle: Waiting for Trigger</p>
                                     </div>
                                 ) : (
-                                    <div class="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                        <div class="flex items-start justify-between mb-8">
+                                    <div class="animate-in fade-in slide-in-from-right-8 duration-700">
+                                        <div class="flex flex-col md:flex-row items-center md:items-start justify-between mb-12 gap-8">
                                             <div>
-                                                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Inference Result</div>
-                                                <div class="flex items-center gap-6">
-                                                    <div class="text-6xl font-black text-gray-900">{result.prediction}</div>
+                                                <div class="text-[10px] font-bold text-gray-500 uppercase tracking-[0.3em] mb-4">Inference Output</div>
+                                                <div class="flex items-center gap-10">
+                                                    <div class="text-[120px] leading-none font-black text-white italic drop-shadow-2xl">{result.prediction}</div>
+                                                    <div class="h-20 w-[1px] bg-white/10 hidden md:block"></div>
                                                     <div>
-                                                        <div class="text-sm font-semibold text-gray-500 mb-1">Model Confidence</div>
-                                                        <div class="text-2xl font-bold text-teal-600">{(result.confidence * 100).toFixed(1)}%</div>
+                                                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Confidence Score</div>
+                                                        <div class="text-4xl font-black mono text-emerald-400 italic">{(result.confidence * 100).toFixed(2)}%</div>
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div class={`px-6 py-3 rounded-2xl border-2 font-black text-lg tracking-wider ${getDecisionColor(result.decision)}`}>
-                                                {result.decision}
+
+                                            <div class="flex flex-col items-center md:items-end">
+                                                <div class="text-[9px] font-bold text-gray-500 uppercase tracking-[0.2em] mb-3">Abstention Decision</div>
+                                                <div class={`px-8 py-4 rounded-xl border font-black text-xl tracking-[0.2em] italic transition-all shadow-2xl ${result.decision === 'PROCEED' ? 'border-emerald-500 text-emerald-500 bg-emerald-500/5' :
+                                                        result.decision === 'REVIEW' ? 'border-amber-500 text-amber-500 bg-amber-500/5' :
+                                                            'border-rose-500 text-rose-500 bg-rose-500/5'
+                                                    }`}>
+                                                    {result.decision}
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <div class="mb-8">
-                                            <div class="w-full bg-gray-100 h-3 rounded-full overflow-hidden">
-                                                <div class="bg-teal-500 h-full transition-all duration-1000" style={{ width: `${result.confidence * 100}%` }}></div>
+                                        <div class="space-y-3">
+                                            <div class="flex justify-between text-[9px] font-bold text-gray-500 uppercase tracking-widest px-1">
+                                                <span>Model Probability Vector</span>
+                                                <span class="mono">VAL: {result.confidence.toFixed(4)}</span>
+                                            </div>
+                                            <div class="w-full bg-white/5 h-2 rounded-full overflow-hidden border border-white/5">
+                                                <div class="bg-gradient-to-r from-emerald-500 to-indigo-500 h-full transition-all duration-1000 shadow-[0_0_15px_rgba(16,185,129,0.5)]" style={{ width: `${result.confidence * 100}%` }}></div>
                                             </div>
                                         </div>
 
-                                        <div class="p-6 bg-gray-50 rounded-2xl border border-gray-100">
-                                            <div class="flex items-center gap-3">
-                                                <div class="p-2 bg-white rounded-xl shadow-sm">
-                                                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                                </div>
-                                                <div>
-                                                    <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Abstention Logic Reason</div>
-                                                    <div class="text-sm font-medium text-gray-700 italic">"{result.reason.replace(/_/g, ' ')}"</div>
-                                                </div>
+                                        <div class="mt-12 p-6 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 flex items-center gap-6">
+                                            <div class="p-3 bg-emerald-500/10 rounded-xl">
+                                                <svg class="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                            </div>
+                                            <div>
+                                                <div class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1">Decision Justification</div>
+                                                <div class="text-sm font-medium text-emerald-100/80 mono uppercase tracking-wider">PROTO_SIGNAL: {result.reason.replace(/_/g, ' ')}</div>
                                             </div>
                                         </div>
                                     </div>
                                 )}
                             </section>
 
-                            {/* Risk Timeline */}
-                            <section class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-                                <h2 class="text-lg font-semibold mb-6 flex items-center justify-between">
-                                    <div class="flex items-center gap-2">
-                                        <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
-                                        Risk Evolution Timeline
+                            <section class="glass-panel p-8">
+                                <h2 class="text-sm font-bold mb-8 flex items-center justify-between opacity-80">
+                                    <div class="flex items-center gap-3 uppercase tracking-[0.2em] text-gray-300">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+                                        Risk Evolution Log
                                     </div>
-                                    <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Live Updates Every 5s</div>
+                                    <div class="text-[9px] mono text-emerald-500 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                                        LIVE_SYNC_STABLE
+                                    </div>
                                 </h2>
                                 <div class="h-64 w-full">
                                     <canvas ref={chartRef}></canvas>
                                 </div>
                             </section>
                         </div>
-                    </main>
+                    </div>
 
-                    <footer class="mt-20 pt-10 border-t border-gray-100 text-center">
-                        <p class="text-xs font-medium text-gray-400 uppercase tracking-widest">&copy; 2026 AI Abstention Engine &bull; Portfolio Demo</p>
+                    <footer class="mt-20 pt-10 border-t border-white/5 text-center flex flex-col items-center">
+                        <div class="mb-4 flex gap-4 opacity-30">
+                            {[1, 2, 3, 4].map(i => <div key={i} class="w-1 h-1 bg-white rounded-full"></div>)}
+                        </div>
+                        <p class="text-[10px] font-bold text-gray-600 uppercase tracking-[0.5em]">&copy; 2026 AEGIS OPS SYSTEM &bull; DEPLOYMENT: RENDER_AUTO</p>
                     </footer>
                 </div>
             );
