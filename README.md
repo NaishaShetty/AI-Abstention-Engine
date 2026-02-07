@@ -5,6 +5,7 @@ A production-inspired system that demonstrates how AI models can know when not t
 
 # Live Demo
 
+- 📍 Demo URL : [http://127.0.0.1:8000/](https://ai-abstention-engine.onrender.com/)
 - 📍 Dashboard (Local Demo): http://127.0.0.1:8000/
 - 📍 Interactive API Docs (FastAPI / Swagger): http://127.0.0.1:8000/docs
   
