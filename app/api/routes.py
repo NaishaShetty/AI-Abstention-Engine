@@ -40,46 +40,56 @@ def predict(req: PredictRequest, db: Session = Depends(get_db)):
     # Convert input
     x = torch.tensor(req.features).float()
 
-    # Inference
+    # Model Inference
     if req.force_error:
         confidence = 0.20 # Force a low confidence
-        prediction = 0
     else:
-        confidence = model(x).item()
-        prediction = int(confidence >= 0.5)
+        with torch.no_grad():
+            confidence = model(x).item()
+    
+    raw_prediction = int(confidence >= 0.5)
 
-    # 1. Get current system risk (before this click)
+    # 1. Get current system risk
     current_risk = compute_risk_score(db)
 
     # 2. Make decision based on current confidence and system state
-    decision, reason = abstain_decision(confidence, current_risk)
+    decision, reasons, band = abstain_decision(confidence, current_risk)
 
-    # 3. Simulated error signal
-    if req.force_error:
-        error = 1
+    # 3. Suppressed/Actual Prediction
+    # If ABSTAIN, prediction is -1 (null), but we show what it would have been
+    if decision == "ABSTAIN":
+        final_prediction = -1 
+        suppressed = raw_prediction
     else:
-        error = int(confidence < 0.45)
+        final_prediction = raw_prediction
+        suppressed = None
 
-    # 4. Save the event
+    # 4. Simulated error signal for risk engine
+    error = int(confidence < 0.45) if not req.force_error else 1
+
+    # 5. Save the event
     new_log = FailureLog(
         confidence=confidence,
         error=error,
-        risk_score=0.0, # Placeholder
+        risk_score=current_risk, # Store risk at time of decision
         decision=decision
     )
     db.add(new_log)
     db.commit()
 
-    # 5. RECOMPUTE RISK (Now includes the event we just saved)
+    # 6. Update shared risk (simplified: compute after save)
     final_risk = compute_risk_score(db)
-    new_log.risk_score = final_risk
+    new_log.risk_score = final_risk # Corrected to final risk after event
     db.commit()
 
     return PredictResponse(
-        prediction=prediction,
+        prediction=final_prediction,
         confidence=confidence,
         decision=decision,
-        reason=reason
+        reasons=reasons,
+        suppressed_prediction=suppressed,
+        risk_score=final_risk,
+        uncertainty_band=band
     )
 
 
@@ -88,35 +98,23 @@ def predict(req: PredictRequest, db: Session = Depends(get_db)):
 # -----------------------------
 @router.get("/health")
 def system_health(db: Session = Depends(get_db)):
-    logs = (
-        db.query(FailureLog)
-        .order_by(FailureLog.timestamp.desc())
-        .limit(50)
-        .all()
-    )
+    from app.core.failure_memory import TIME_DECAY_RATE
+    from app.core.abstention import EXIT_RISK_THRESHOLD
+    import math
 
-    if not logs:
-        return {
-            "status": "cold_start",
-            "risk": 0.0,
-            "abstain_rate_50": 0.0,
-            "review_rate_50": 0.0
-        }
+    log = db.query(FailureLog).order_by(FailureLog.timestamp.desc()).first()
+    
+    if not log:
+        return {"status": "cold_start", "risk": 0.0, "risk_state": "low"}
 
-    total = len(logs)
+    current_risk = compute_risk_score(db)
+    
+    # Recovery ETA Calculation
+    if current_risk > EXIT_RISK_THRESHOLD:
+        eta_seconds = -math.log(EXIT_RISK_THRESHOLD / current_risk) / TIME_DECAY_RATE
+    else:
+        eta_seconds = 0
 
-    # Recompute decisions (DO NOT store them)
-    abstains = 0
-    reviews = 0
-
-    for l in logs:
-        d, _ = abstain_decision(l.confidence, l.risk_score)
-        if d == "ABSTAIN":
-            abstains += 1
-        elif d == "REVIEW":
-            reviews += 1
-
-    current_risk = logs[0].risk_score
 
     if current_risk < 2.0:
         risk_state = "low"
@@ -129,6 +127,38 @@ def system_health(db: Session = Depends(get_db)):
         "status": "healthy",
         "risk": round(current_risk, 3),
         "risk_state": risk_state,
-        "abstain_rate_50": round(abstains / total, 3),
-        "review_rate_50": round(reviews / total, 3)
+        "recovery_eta_seconds": round(max(eta_seconds, 0), 1)
     }
+
+# -----------------------------
+# 📊 Metrics endpoint
+# -----------------------------
+@router.get("/metrics")
+def get_metrics(db: Session = Depends(get_db)):
+    logs = db.query(FailureLog).order_by(FailureLog.timestamp.desc()).limit(100).all()
+    
+    if not logs:
+        return {"msg": "no data"}
+
+    total = len(logs)
+    abstains = sum(1 for l in logs if l.decision == "ABSTAIN")
+    reviews = sum(1 for l in logs if l.decision == "REVIEW")
+    errors = sum(1 for l in logs if l.error == 1)
+    avg_conf = sum(l.confidence for l in logs) / total
+
+    return {
+        "avg_confidence": round(avg_conf, 3),
+        "abstain_rate": round(abstains / total, 3),
+        "review_rate": round(reviews / total, 3),
+        "error_rate": round(errors / total, 3),
+        "total_events": total,
+        # Audit Log for table
+        "audit_log": [{
+            "timestamp": l.timestamp.strftime("%H:%M:%S"),
+            "confidence": round(l.confidence, 3),
+            "decision": l.decision,
+            "risk": round(l.risk_score, 2),
+            "error": l.error
+        } for l in logs[:10]]
+    }
+

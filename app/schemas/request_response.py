@@ -10,4 +10,8 @@ class PredictResponse(BaseModel):
     prediction: int
     confidence: float
     decision: str
-    reason: str
+    reasons: List[str]
+    suppressed_prediction: Optional[int] = None
+    risk_score: float
+    uncertainty_band: str
+

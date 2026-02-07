@@ -49,7 +49,7 @@
             border: 1px solid var(--border);
             border-radius: 24px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .glass-panel:hover {
@@ -57,39 +57,9 @@
             box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
         }
 
-        input[type="range"] {
-            -webkit-appearance: none;
-            background: transparent;
-        }
-
-        input[type="range"]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 6px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-        }
-
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 18px;
-            width: 18px;
-            border-radius: 50%;
-            background: var(--primary);
-            cursor: pointer;
-            margin-top: -6px;
-            box-shadow: 0 0 10px var(--primary);
-            transition: transform 0.2s;
-        }
-
-        input[type="range"]:hover::-webkit-slider-thumb {
-            transform: scale(1.2);
-        }
-
         .btn-primary {
             background: linear-gradient(135deg, var(--primary), #059669);
             transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
         }
 
         .btn-primary:hover {
@@ -97,44 +67,60 @@
             box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
         }
 
-        .glow-text {
-            text-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
-        }
-
         .mono {
             font-family: 'JetBrains Mono', monospace;
         }
 
-        @keyframes pulse-soft {
+        @keyframes pulse-glow {
 
             0%,
             100% {
-                opacity: 1;
+                box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
             }
 
             50% {
-                opacity: 0.6;
+                box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
             }
         }
 
-        .animate-pulse-soft {
-            animation: pulse-soft 2s infinite ease-in-out;
+        .decision-glow-PROCEED {
+            box-shadow: 0 0 40px rgba(16, 185, 129, 0.3);
+            border-color: rgba(16, 185, 129, 0.4);
         }
 
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 8px;
+        .decision-glow-REVIEW {
+            box-shadow: 0 0 40px rgba(245, 158, 11, 0.3);
+            border-color: rgba(245, 158, 11, 0.4);
+        }
+
+        .decision-glow-ABSTAIN {
+            box-shadow: 0 0 40px rgba(239, 68, 68, 0.3);
+            border-color: rgba(239, 68, 68, 0.4);
+        }
+
+        .band-unsafe {
+            background: #ef4444;
+        }
+
+        .band-uncertain {
+            background: #f59e0b;
+        }
+
+        .band-safe {
+            background: #10b981;
+        }
+
+        .audit-row {
+            transition: all 0.2s;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .audit-row:hover {
+            background: rgba(255, 255, 255, 0.03);
         }
 
         ::-webkit-scrollbar {
             width: 6px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: transparent;
         }
 
         ::-webkit-scrollbar-thumb {
@@ -155,99 +141,72 @@
             const [features, setFeatures] = useState([0.5, 0.5, 0.5, 0.5, 0.5]);
             const [result, setResult] = useState(null);
             const [health, setHealth] = useState(null);
+            const [metrics, setMetrics] = useState(null);
             const [loading, setLoading] = useState(false);
             const chartRef = useRef(null);
             const chartInstance = useRef(null);
             const [history, setHistory] = useState([]);
 
             useEffect(() => {
-                fetchHealth();
-                const interval = setInterval(fetchHealth, 5000);
+                fetchData();
+                const interval = setInterval(fetchData, 4000);
                 return () => clearInterval(interval);
             }, []);
+
+            const fetchData = async () => {
+                try {
+                    const [hRes, mRes] = await Promise.all([
+                        fetch('/api/health'),
+                        fetch('/api/metrics')
+                    ]);
+                    const hData = await hRes.json();
+                    const mData = await mRes.json();
+                    setHealth(hData);
+                    setMetrics(mData);
+                } catch (err) {
+                    console.error("Fetch error:", err);
+                }
+            };
 
             useEffect(() => {
                 if (health && health.risk !== undefined) {
                     setHistory(prev => {
                         const time = new Date().toLocaleTimeString('en-US', { hour12: false });
-                        const newElement = {
-                            time,
-                            risk: health.risk,
-                            abstain: health.abstain_rate_50,
-                            review: health.review_rate_50
-                        };
-                        const newHistory = [...prev, newElement];
-                        return newHistory.slice(-25);
+                        return [...prev, { time, risk: health.risk }].slice(-25);
                     });
                 }
             }, [health]);
 
             useEffect(() => {
                 if (chartRef.current && history.length > 0) {
-                    if (chartInstance.current) {
-                        chartInstance.current.destroy();
-                    }
+                    if (chartInstance.current) chartInstance.current.destroy();
                     const ctx = chartRef.current.getContext('2d');
-                    Chart.defaults.color = 'rgba(255, 255, 255, 0.5)';
-                    Chart.defaults.font.family = 'Outfit';
-
                     chartInstance.current = new Chart(ctx, {
                         type: 'line',
                         data: {
                             labels: history.map(h => h.time),
-                            datasets: [
-                                {
-                                    label: 'Risk Vector',
-                                    data: history.map(h => h.risk),
-                                    borderColor: '#10b981',
-                                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                                    borderWidth: 2,
-                                    fill: true,
-                                    tension: 0.4,
-                                    yAxisID: 'y'
-                                },
-                                {
-                                    label: 'Policy Rates',
-                                    data: history.map(h => (h.abstain + h.review) * 5), // Scaled for visibility
-                                    borderColor: '#6366f1',
-                                    borderDash: [5, 5],
-                                    borderWidth: 1,
-                                    fill: false,
-                                    tension: 0.1,
-                                    yAxisID: 'y'
-                                }
-                            ]
+                            datasets: [{
+                                label: 'Risk Score',
+                                data: history.map(h => h.risk),
+                                borderColor: '#10b981',
+                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4
+                            }]
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            plugins: {
-                                legend: { display: false }
-                            },
+                            plugins: { legend: { display: false } },
                             scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    max: 10,
-                                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
-                                },
-                                x: {
-                                    grid: { display: false }
-                                }
+                                y: { beginAtZero: true, max: 10, grid: { color: 'rgba(255, 255, 255, 0.05)' } },
+                                x: { grid: { display: false } }
                             }
                         }
                     });
                 }
             }, [history]);
-
-            const fetchHealth = async () => {
-                try {
-                    const res = await fetch('/api/health');
-                    const data = await res.json();
-                    setHealth(data);
-                } catch (err) {
-                    console.error("Health fetch error:", err);
-                }
-            };
 
             const runPrediction = async (presetFeatures = null, forceError = false) => {
                 setLoading(true);
@@ -256,222 +215,221 @@
                     const res = await fetch('/api/predict', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            features: currentFeatures,
-                            force_error: forceError
-                        })
+                        body: JSON.stringify({ features: currentFeatures, force_error: forceError })
                     });
                     const data = await res.json();
                     setResult(data);
-                    await fetchHealth();
+                    fetchData();
                 } catch (err) {
-                    alert("System Offline");
+                    console.error(err);
                 } finally {
                     setLoading(false);
                 }
             };
 
-            const triggerManualFailure = () => {
-                const failVector = [0.0, 0.0, 0.0, 0.0, 0.0];
-                setFeatures(failVector);
-                runPrediction(failVector, true);
+            const getModeBadge = () => {
+                if (!health) return { label: 'CONNECTING', color: 'bg-gray-500' };
+                if (health.risk_state === 'critical') return { label: 'SAFETY LOCKDOWN', color: 'bg-rose-500 shadow-rose-500/50' };
+                if (health.risk_state === 'elevated') return { label: 'HUMAN REVIEW MODE', color: 'bg-amber-500 shadow-amber-500/50' };
+                return { label: 'NORMAL OPERATION', color: 'bg-emerald-500 shadow-emerald-500/50' };
             };
 
-            const handleFeatureChange = (idx, val) => {
-                const newFeatures = [...features];
-                newFeatures[idx] = parseFloat(val);
-                setFeatures(newFeatures);
-            };
-
-            const getRiskColor = (state) => {
-                switch (state) {
-                    case 'low': return 'text-emerald-400';
-                    case 'elevated': return 'text-amber-400';
-                    case 'critical': return 'text-rose-400';
-                    default: return 'text-white';
-                }
-            };
+            const mode = getModeBadge();
 
             return (
                 <div class="max-w-[1400px] mx-auto px-6 py-8 md:py-12">
-                    {/* Header */}
-                    <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
-                        <div>
-                            <div class="flex items-center gap-3 mb-2">
-                                <div class="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.040L3 4.53V9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622V4.53l-.382-.016z"></path></svg>
-                                </div>
-                                <h1 class="text-4xl font-extrabold tracking-tight text-white uppercase italic">Aegis</h1>
+                    {/* TOP NAVBAR */}
+                    <div class="flex justify-between items-center mb-12">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-2xl">
+                                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.040L3 4.53V9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622V4.53l-.382-.016z"></path></svg>
                             </div>
-                            <p class="text-gray-400 font-medium ml-1">Adaptive AI Abstention Control Protocol</p>
+                            <h1 class="text-4xl font-black tracking-tighter text-white uppercase italic">Aegis <span class="text-emerald-500">v2</span></h1>
                         </div>
-
-                        <div class="glass-panel px-6 py-3 flex items-center gap-6 border-emerald-500/20">
-                            <div class="flex items-center">
-                                <span class={`status-dot ${health?.status === 'healthy' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
-                                <span class="text-sm font-bold uppercase tracking-widest opacity-80">{health?.status || 'INIT'}</span>
-                            </div>
-                            <div class="h-4 w-[1px] bg-white/10"></div>
-                            <div class="text-xs mono opacity-50">NODE_01_PROD</div>
+                        <div class={`px-6 py-2 rounded-full text-[10px] font-black tracking-[0.2em] text-white shadow-lg transition-all duration-1000 ${mode.color}`}>
+                            {mode.label}
                         </div>
-                    </header>
+                    </div>
 
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                        {/* Control Column */}
+                        {/* LEFT COLUMN */}
                         <div class="lg:col-span-4 space-y-8">
                             <section class="glass-panel p-8">
-                                <h2 class="text-lg font-bold mb-8 flex items-center gap-3 uppercase tracking-wider text-emerald-400">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
-                                    Input Vectors
-                                </h2>
+                                <h2 class="text-xs font-bold mb-8 uppercase tracking-[0.3em] text-emerald-400">Control Interface</h2>
                                 <div class="space-y-6">
                                     {features.map((f, i) => (
                                         <div key={i} class="group">
-                                            <div class="flex justify-between text-[11px] font-bold text-gray-400 mb-3 uppercase tracking-widest group-hover:text-emerald-400 transition-colors">
-                                                <span>Param {i + 1}</span>
+                                            <div class="flex justify-between text-[10px] font-bold text-gray-500 mb-3 uppercase tracking-widest group-hover:text-emerald-400">
+                                                <span>Feat {i + 1}</span>
                                                 <span class="mono">{f.toFixed(3)}</span>
                                             </div>
-                                            <input
-                                                type="range" min="0" max="1" step="0.001"
-                                                value={f}
-                                                onChange={(e) => handleFeatureChange(i, e.target.value)}
-                                                class="w-full"
-                                            />
+                                            <input type="range" min="0" max="1" step="0.001" value={f} onChange={(e) => {
+                                                const n = [...features]; n[i] = parseFloat(e.target.value); setFeatures(n);
+                                            }} class="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
                                         </div>
                                     ))}
                                 </div>
-                                <div class="flex flex-col gap-4 mt-10">
-                                    <button
-                                        onClick={() => runPrediction()}
-                                        disabled={loading}
-                                        class={`btn-primary w-full py-4 rounded-xl font-bold text-sm uppercase tracking-widest text-white active:scale-95 ${loading ? 'opacity-50 grayscale' : ''}`}
-                                    >
-                                        {loading ? 'Processing...' : 'Execute Inference'}
-                                    </button>
-                                    <button
-                                        onClick={triggerManualFailure}
-                                        class="w-full py-4 rounded-xl font-bold text-[10px] uppercase tracking-widest text-rose-400 border border-rose-400/20 hover:bg-rose-400/10 transition-all active:scale-95"
-                                    >
-                                        Inject failure signal
-                                    </button>
-                                </div>
+                                <button onClick={() => runPrediction()} disabled={loading} class="btn-primary w-full mt-10 py-4 rounded-xl font-bold text-xs uppercase tracking-widest text-white active:scale-95">
+                                    {loading ? 'RUNNING...' : 'Execute Protocol'}
+                                </button>
+                                <button onClick={() => runPrediction(null, true)} class="w-full mt-4 py-3 text-[9px] font-bold uppercase tracking-widest text-rose-400 border border-rose-400/20 hover:bg-rose-400/10 rounded-xl transition-all">
+                                    Simulate Anomaly
+                                </button>
                             </section>
 
+                            {/* RECOVERY ETA CASE */}
+                            {health?.recovery_eta_seconds > 0 && (
+                                <div class="glass-panel p-6 bg-amber-500/5 border-amber-500/20 animate-pulse">
+                                    <div class="text-[9px] font-bold text-amber-500 uppercase tracking-widest mb-1">Recovery ETA</div>
+                                    <div class="text-2xl font-black text-amber-200 mono">~{health.recovery_eta_seconds}s</div>
+                                    <div class="text-[9px] text-amber-500/60 mt-2 uppercase tracking-tight">System cooldown in progress</div>
+                                </div>
+                            )}
+
+                            {/* METRICS PANEL */}
                             <section class="glass-panel p-8">
-                                <h2 class="text-lg font-bold mb-8 flex items-center gap-3 uppercase tracking-wider text-indigo-400">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                                    System Telemetry
-                                </h2>
-                                {health ? (
+                                <h2 class="text-xs font-bold mb-8 uppercase tracking-[0.3em] text-indigo-400">Decision Metrics</h2>
+                                {metrics ? (
                                     <div class="grid grid-cols-2 gap-4">
-                                        <div class="p-6 bg-white/5 rounded-2xl border border-white/5">
-                                            <div class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-2">Risk Index</div>
-                                            <div class={`text-3xl font-black italic mono ${getRiskColor(health.risk_state)}`}>{health.risk.toFixed(2)}</div>
+                                        <div class="p-4 bg-white/5 rounded-2xl">
+                                            <div class="text-[8px] font-bold text-gray-500 uppercase tracking-widest mb-1">Avg Confidence</div>
+                                            <div class="text-xl font-bold mono text-emerald-400">{(metrics.avg_confidence * 100).toFixed(1)}%</div>
                                         </div>
-                                        <div class="p-6 bg-white/5 rounded-2xl border border-white/5">
-                                            <div class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-2">Policy Modality</div>
-                                            <div class={`text-xs font-bold uppercase tracking-wider mt-2 ${getRiskColor(health.risk_state)}`}>{health.risk_state}</div>
+                                        <div class="p-4 bg-white/5 rounded-2xl">
+                                            <div class="text-[8px] font-bold text-gray-500 uppercase tracking-widest mb-1">Error Rate</div>
+                                            <div class="text-xl font-bold mono text-rose-400">{(metrics.error_rate * 100).toFixed(1)}%</div>
                                         </div>
-                                        <div class="p-4 bg-white/5 rounded-2xl border border-white/5">
-                                            <div class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1">Abstain %</div>
-                                            <div class="text-xl font-bold mono text-white/80">{(health.abstain_rate_50 * 100).toFixed(1)}%</div>
+                                        <div class="p-4 bg-white/5 rounded-2xl">
+                                            <div class="text-[8px] font-bold text-gray-500 uppercase tracking-widest mb-1">Abstain Rate</div>
+                                            <div class="text-xl font-bold mono text-indigo-400">{(metrics.abstain_rate * 100).toFixed(1)}%</div>
                                         </div>
-                                        <div class="p-4 bg-white/5 rounded-2xl border border-white/5">
-                                            <div class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1">Review %</div>
-                                            <div class="text-xl font-bold mono text-white/80">{(health.review_rate_50 * 100).toFixed(1)}%</div>
+                                        <div class="p-4 bg-white/5 rounded-2xl">
+                                            <div class="text-[8px] font-bold text-gray-500 uppercase tracking-widest mb-1">Total Logs</div>
+                                            <div class="text-xl font-bold mono text-gray-300">{metrics.total_events}</div>
                                         </div>
                                     </div>
-                                ) : (
-                                    <div class="animate-pulse space-y-4">
-                                        <div class="h-16 bg-white/5 rounded-2xl"></div>
-                                        <div class="h-16 bg-white/5 rounded-2xl"></div>
-                                    </div>
-                                )}
+                                ) : <div class="h-32 animate-pulse bg-white/5 rounded-2xl"></div>}
                             </section>
                         </div>
 
-                        {/* Display Column */}
+                        {/* RIGHT COLUMN */}
                         <div class="lg:col-span-8 space-y-8">
-                            <section class="glass-panel p-10 min-h-[360px] flex flex-col justify-center relative overflow-hidden">
+                            {/* RESULT PANEL */}
+                            <section class={`glass-panel p-10 min-h-[380px] flex flex-col justify-center relative transition-all duration-500 ${result ? `decision-glow-${result.decision}` : ''}`}>
                                 {!result ? (
-                                    <div class="text-center py-10 opacity-20">
-                                        <div class="mb-6 flex justify-center">
-                                            <svg class="w-20 h-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A10.003 10.003 0 0012 3c1.268 0 2.39.675 3 1.71m3.892 8.76l.066.017c.595.145 1.147.223 1.64.223h0c1.1 0 2-.9 2-2V8a2 2 0 00-2-2h-3.32m-1.79 0A2 2 0 0014 4h-4a2 2 0 00-2 2h0m3 4h0a2 2 0 002 2h0a2 2 0 002-2H9z"></path></svg>
-                                        </div>
-                                        <p class="text-sm uppercase tracking-[0.2em] font-medium">System Idle: Waiting for Trigger</p>
+                                    <div class="text-center opacity-20">
+                                        <svg class="w-16 h-16 mx-auto mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                        <p class="text-xs uppercase tracking-widest">Waiting for incoming signal...</p>
                                     </div>
                                 ) : (
-                                    <div class="animate-in fade-in slide-in-from-right-8 duration-700">
-                                        <div class="flex flex-col md:flex-row items-center md:items-start justify-between mb-12 gap-8">
+                                    <div class="animate-in fade-in slide-in-from-bottom-8 duration-500">
+                                        <div class="flex justify-between items-start mb-8">
                                             <div>
-                                                <div class="text-[10px] font-bold text-gray-500 uppercase tracking-[0.3em] mb-4">Inference Output</div>
-                                                <div class="flex items-center gap-10">
-                                                    <div class="text-[120px] leading-none font-black text-white italic drop-shadow-2xl">{result.prediction}</div>
-                                                    <div class="h-20 w-[1px] bg-white/10 hidden md:block"></div>
-                                                    <div>
-                                                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Confidence Score</div>
-                                                        <div class="text-4xl font-black mono text-emerald-400 italic">{(result.confidence * 100).toFixed(2)}%</div>
-                                                    </div>
+                                                <div class="text-[10px] font-bold text-gray-500 uppercase tracking-[0.3em] mb-4">Protocol Result</div>
+                                                <div class="flex items-baseline gap-4">
+                                                    <span class="text-8xl font-black italic text-white drop-shadow-2xl">
+                                                        {result.prediction === -1 ? 'Ø' : result.prediction}
+                                                    </span>
+                                                    <span class={`text-sm font-bold uppercase py-1 px-3 rounded-md ${result.uncertainty_band === 'unsafe' ? 'text-rose-400 bg-rose-400/10' : result.uncertainty_band === 'uncertain' ? 'text-amber-400 bg-amber-400/10' : 'text-emerald-400 bg-emerald-400/10'}`}>
+                                                        {result.uncertainty_band} Band
+                                                    </span>
                                                 </div>
                                             </div>
+                                            <div class={`px-8 py-4 rounded-2xl border-2 font-black text-2xl tracking-[0.2em] italic ${result.decision === 'PROCEED' ? 'border-emerald-500 text-emerald-500' :
+                                                    result.decision === 'REVIEW' ? 'border-amber-500 text-amber-500' : 'border-rose-500 text-rose-500'
+                                                }`}>
+                                                {result.decision}
+                                            </div>
+                                        </div>
 
-                                            <div class="flex flex-col items-center md:items-end">
-                                                <div class="text-[9px] font-bold text-gray-500 uppercase tracking-[0.2em] mb-3">Abstention Decision</div>
-                                                <div class={`px-8 py-4 rounded-xl border font-black text-xl tracking-[0.2em] italic transition-all shadow-2xl ${result.decision === 'PROCEED' ? 'border-emerald-500 text-emerald-500 bg-emerald-500/5' :
-                                                        result.decision === 'REVIEW' ? 'border-amber-500 text-amber-500 bg-amber-500/5' :
-                                                            'border-rose-500 text-rose-500 bg-rose-500/5'
-                                                    }`}>
-                                                    {result.decision}
+                                        {/* CONFIDENCE BAR WITH BANDS */}
+                                        <div class="mb-10">
+                                            <div class="flex justify-between text-[8px] font-bold text-gray-500 mb-2 uppercase tracking-widest">
+                                                <span>Signal Integrity</span>
+                                                <span class="mono">CONFIDENCE: {(result.confidence * 100).toFixed(2)}%</span>
+                                            </div>
+                                            <div class="h-3 w-full bg-white/5 rounded-full overflow-hidden flex border border-white/5 relative">
+                                                <div class="absolute left-[45%] top-0 h-full w-[1px] bg-white/20 z-10" title="Safety Threshold (0.45)"></div>
+                                                <div class="absolute left-[85%] top-0 h-full w-[1px] bg-white/20 z-10" title="High-Conf Threshold (0.85)"></div>
+                                                <div class="h-full transition-all duration-1000 shadow-[0_0_20px_rgba(16,185,129,0.4)]"
+                                                    style={{ width: `${result.confidence * 100}%`, backgroundColor: result.confidence < 0.45 ? '#ef4444' : result.confidence < 0.85 ? '#f59e0b' : '#10b981' }}></div>
+                                            </div>
+                                        </div>
+
+                                        {/* EXPLAINABILITY CHIPS */}
+                                        <div class="flex flex-wrap gap-2 mb-8">
+                                            {result.reasons.map((r, i) => (
+                                                <span key={i} class="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[9px] font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
+                                                    <span class="w-1.5 h-1.5 bg-indigo-500 rounded-full"></span>
+                                                    {r.replace(/_/g, ' ')}
+                                                </span>
+                                            ))}
+                                        </div>
+
+                                        {/* PORTFOLIO GOLD: SUPPRESSED PREDICTION */}
+                                        {result.decision === 'ABSTAIN' && (
+                                            <div class="p-4 bg-white/5 border border-white/5 rounded-xl flex items-center gap-4 opacity-60">
+                                                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"></path></svg>
+                                                <div class="text-[10px] font-medium text-gray-400">
+                                                    Model suppressed output <span class="mono text-white">[{result.suppressed_prediction}]</span> for safety. Raw inference signal deemed unreliable.
                                                 </div>
                                             </div>
-                                        </div>
-
-                                        <div class="space-y-3">
-                                            <div class="flex justify-between text-[9px] font-bold text-gray-500 uppercase tracking-widest px-1">
-                                                <span>Model Probability Vector</span>
-                                                <span class="mono">VAL: {result.confidence.toFixed(4)}</span>
-                                            </div>
-                                            <div class="w-full bg-white/5 h-2 rounded-full overflow-hidden border border-white/5">
-                                                <div class="bg-gradient-to-r from-emerald-500 to-indigo-500 h-full transition-all duration-1000 shadow-[0_0_15px_rgba(16,185,129,0.5)]" style={{ width: `${result.confidence * 100}%` }}></div>
-                                            </div>
-                                        </div>
-
-                                        <div class="mt-12 p-6 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 flex items-center gap-6">
-                                            <div class="p-3 bg-emerald-500/10 rounded-xl">
-                                                <svg class="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                            </div>
-                                            <div>
-                                                <div class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1">Decision Justification</div>
-                                                <div class="text-sm font-medium text-emerald-100/80 mono uppercase tracking-wider">PROTO_SIGNAL: {result.reason.replace(/_/g, ' ')}</div>
-                                            </div>
-                                        </div>
+                                        )}
                                     </div>
                                 )}
                             </section>
 
-                            <section class="glass-panel p-8">
-                                <h2 class="text-sm font-bold mb-8 flex items-center justify-between opacity-80">
-                                    <div class="flex items-center gap-3 uppercase tracking-[0.2em] text-gray-300">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
-                                        Risk Evolution Log
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {/* AUDIT LOG TABLE */}
+                                <section class="glass-panel p-8">
+                                    <h2 class="text-xs font-bold mb-6 uppercase tracking-[0.3em] text-gray-400">Tactical Audit Log</h2>
+                                    <div class="overflow-hidden">
+                                        <table class="w-full text-left text-[9px] font-bold">
+                                            <thead class="text-gray-600 uppercase tracking-widest border-bottom border-white/5">
+                                                <tr>
+                                                    <th class="py-2">Time</th>
+                                                    <th class="py-2">Conf</th>
+                                                    <th class="py-2">Risk</th>
+                                                    <th class="py-2">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="text-gray-400 uppercase">
+                                                {metrics?.audit_log?.map((l, i) => (
+                                                    <tr key={i} class="audit-row">
+                                                        <td class="py-3 mono">{l.timestamp}</td>
+                                                        <td class="py-3 mono">{(l.confidence * 100).toFixed(0)}%</td>
+                                                        <td class="py-3 mono">{l.risk}</td>
+                                                        <td class="py-3">
+                                                            <span class={l.decision === 'PROCEED' ? 'text-emerald-500' : l.decision === 'REVIEW' ? 'text-amber-500' : 'text-rose-500'}>
+                                                                {l.decision}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
                                     </div>
-                                    <div class="text-[9px] mono text-emerald-500 flex items-center gap-2">
-                                        <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                                        LIVE_SYNC_STABLE
-                                    </div>
-                                </h2>
-                                <div class="h-64 w-full">
-                                    <canvas ref={chartRef}></canvas>
-                                </div>
+                                </section>
+
+                                {/* RISK TIMELINE */}
+                                <section class="glass-panel p-8">
+                                    <h2 class="text-xs font-bold mb-6 uppercase tracking-[0.3em] text-gray-400">Risk Vector Evolution</h2>
+                                    <div class="h-48 w-full"><canvas ref={chartRef}></canvas></div>
+                                </section>
+                            </div>
+
+                            {/* WHY THIS EXISTS SECTION */}
+                            <section class="p-10 border-t border-white/5 opacity-50 text-center max-w-2xl mx-auto">
+                                <h3 class="text-xs font-bold text-emerald-500 uppercase tracking-widest mb-4">Safety Engineering Intent</h3>
+                                <p class="text-sm leading-relaxed text-gray-400 italic">
+                                    "Modern ML systems must know when not to act. This engine demonstrates dynamic abstention—calculating real-time system risk and model uncertainty to suppress untrusted predictions, enabling safe recovery and human-in-the-loop oversight."
+                                </p>
                             </section>
                         </div>
                     </div>
 
                     <footer class="mt-20 pt-10 border-t border-white/5 text-center flex flex-col items-center">
-                        <div class="mb-4 flex gap-4 opacity-30">
-                            {[1, 2, 3, 4].map(i => <div key={i} class="w-1 h-1 bg-white rounded-full"></div>)}
-                        </div>
-                        <p class="text-[10px] font-bold text-gray-600 uppercase tracking-[0.5em]">&copy; 2026 AEGIS OPS SYSTEM &bull; DEPLOYMENT: RENDER_AUTO</p>
+                        <p class="text-[10px] font-bold text-gray-600 uppercase tracking-[0.5em]">&copy; 2026 AEGIS TACTICAL OPS &bull; DEPLOYMENT: RENDER_STABLE</p>
                     </footer>
                 </div>
             );

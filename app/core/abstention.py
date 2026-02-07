@@ -16,20 +16,39 @@ def abstain_decision(confidence: float, risk: float):
 
     Returns:
         decision (str): One of ["PROCEED", "REVIEW", "ABSTAIN"]
-        reason (str): Human-readable explanation for traceability
+        reasons (list): List of factors for traceability
+        band (str): Uncertainty band label
     """
-
-    # --- Hard safety gate: low confidence ---
+    reasons = []
+    
+    # 1. Determine Uncertainty Band
     if confidence < LOW_CONF:
-        return "ABSTAIN", "low_model_confidence"
+        band = "unsafe"
+        reasons.append("confidence_below_safety_threshold")
+    elif confidence < HIGH_CONF:
+        band = "uncertain"
+        reasons.append("uncertainty_band_detection")
+    else:
+        band = "safe"
 
-    # --- Elevated risk: route to human review ---
+    # 2. Risk Factors
     if risk >= ENTER_RISK_THRESHOLD:
-        return "REVIEW", "elevated_system_risk"
+        reasons.append("high_system_risk_memory")
+    elif risk > EXIT_RISK_THRESHOLD:
+        reasons.append("system_in_recovery_mode")
 
-    # --- Safe operating region ---
-    if risk <= EXIT_RISK_THRESHOLD and confidence >= HIGH_CONF:
-        return "PROCEED", "high_confidence_low_risk"
+    # 3. Final Decision Logic
+    if confidence < LOW_CONF:
+        return "ABSTAIN", reasons, band
+    
+    if risk >= ENTER_RISK_THRESHOLD:
+        return "ABSTAIN", reasons, band # Tighten safety: Abstain mirror if risk is too high
+    
+    if risk > EXIT_RISK_THRESHOLD:
+        return "REVIEW", reasons, band
+        
+    if confidence < HIGH_CONF:
+        return "REVIEW", reasons, band
 
-    # --- Default: uncertain regime ---
-    return "REVIEW", "uncertain_confidence_risk_tradeoff"
+    return "PROCEED", ["optimal_operating_conditions"], band
+
