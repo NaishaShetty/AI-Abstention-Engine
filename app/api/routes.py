@@ -12,8 +12,13 @@ from app.schemas.request_response import PredictRequest, PredictResponse
 router = APIRouter()
 
 # Load trained model
+import os
+MODEL_PATH = os.path.join(os.getcwd(), "model.pt")
 model = SimpleClassifier(input_dim=5)
+if os.path.exists(MODEL_PATH):
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device('cpu')))
 model.eval()
+
 
 
 # -----------------------------

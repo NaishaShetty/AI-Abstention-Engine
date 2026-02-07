@@ -1,7 +1,5 @@
 requests
 torch
-torchvision
-torchaudio
 fastapi
 uvicorn
 scikit-learn
@@ -12,3 +10,5 @@ psycopg2-binary
 python-dotenv
 pydantic
 requests
+gunicorn
+uvicorn
